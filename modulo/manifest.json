@@ -1,0 +1,21 @@
+{
+  "name": "oc-sap",
+  "version": "1.0.0",
+  "description": "Módulo enchufable de automatización y control de Órdenes de Compra SAP (Reto 03)",
+  "agent": "agent/prompt.md",
+  "knowledge": [
+    "src/knowledge/ordenes-compra.md"
+  ],
+  "tools": [
+    "oc_leer_paquete",
+    "oc_validar",
+    "oc_generar_evidencia",
+    "oc_construir_payload",
+    "oc_crear"
+  ],
+  "rules": ["RC1", "RC2", "RC3", "RC4", "RC5", "RC6", "RC7", "RC8", "RC9", "RC10"],
+  "compatibility": {
+    "runtime": ["node>=20", "bun>=1.1"],
+    "sapAdapter": "SapAdapter"
+  }
+}

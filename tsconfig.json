@@ -3,12 +3,14 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "types": ["node"],
-    "esModuleInterop": true,
+    "rootDir": ".",
+    "outDir": "./dist",
     "strict": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
-    "outDir": "dist",
-    "rootDir": "."
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "types": ["node"]
   },
-  "include": ["src/**/*", "demo.ts"]
+  "include": ["src/**/*", "modulo/**/*", "demo.ts"]
 }
