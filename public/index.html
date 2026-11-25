@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agente Órdenes de Compra SAP — Periferia IT</title>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body { margin: 0; background: #0f172a; color: #e2e8f0; display: flex; height: 100vh; }
+    aside { width: 320px; background: #1e293b; border-right: 1px solid #334155; padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+    main { flex: 1; display: flex; flex-direction: column; }
+    h1 { font-size: 16px; margin: 0; color: #38bdf8; }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin: 8px 0 4px; }
+    .casos { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    button { background: #334155; color: #f8fafc; border: 1px solid #475569; border-radius: 6px; padding: 8px 10px; cursor: pointer; font-size: 13px; text-align: left; }
+    button:hover { background: #38bdf8; color: #0f172a; font-weight: 600; }
+    .btn-confirm { background: #059669; border-color: #10b981; text-align: center; font-weight: 600; }
+    .btn-reset { background: #7f1d1d; border-color: #991b1b; text-align: center; }
+    #chat { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+    .msg { max-width: 82%; padding: 12px 16px; border-radius: 10px; line-height: 1.5; white-space: pre-wrap; font-size: 14px; }
+    .user { align-self: flex-end; background: #0284c7; color: #fff; }
+    .assistant { align-self: flex-start; background: #1e293b; border: 1px solid #334155; }
+    .tools-badge { font-size: 11px; color: #38bdf8; margin-top: 6px; font-family: monospace; }
+    form { display: flex; gap: 10px; padding: 14px 20px; background: #1e293b; border-top: 1px solid #334155; }
+    input { flex: 1; background: #0f172a; border: 1px solid #475569; color: #f8fafc; border-radius: 6px; padding: 10px 12px; font-size: 14px; }
+    .card { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <aside>
+    <div>
+      <h1>Agente OC SAP</h1>
+      <p style="font-size:12px;color:#94a3b8;margin:4px 0 0;">Reto 03 · Periferia IT Group</p>
+    </div>
+
+    <div>
+      <h2>Casos de prueba</h2>
+      <div class="casos" id="casos-list"></div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="btn-confirm" onclick="enviar('Sí, confirmo la excepción y autorizo crear la Orden de Compra en SAP.')">Confirmar excepción</button>
+      <button class="btn-reset" onclick="reiniciar()">Nueva sesión</button>
+    </div>
+
+    <div>
+      <h2>Órdenes creadas en SAP</h2>
+      <div id="ordenes-box" class="card">Sin órdenes registradas aún.</div>
+    </div>
+  </aside>
+
+  <main>
+    <div id="chat">
+      <div class="msg assistant">Hola. Selecciona un caso en el panel izquierdo (ej. <b>sol-001</b> a <b>sol-006</b>) o escribe qué solicitud deseas procesar en SAP.</div>
+    </div>
+    <form onsubmit="handleSubmit(event)">
+      <input id="input" placeholder="Ej: Procesa la solicitud sol-001..." autocomplete="off" />
+      <button type="submit" style="background:#38bdf8;color:#0f172a;font-weight:600;padding:0 18px;">Enviar</button>
+    </form>
+  </main>
+
+  <script>
+    const sessionId = "web-" + Date.now();
+    const chat = document.getElementById("chat");
+    const input = document.getElementById("input");
+
+    function agregarMensaje(role, text, tools = []) {
+      const div = document.createElement("div");
+      div.className = "msg " + role;
+      div.textContent = text;
+      if (tools.length > 0) {
+        const badge = document.createElement("div");
+        badge.className = "tools-badge";
+        badge.textContent = "Herramientas: " + tools.map(t => t.name).join(" → ");
+        div.appendChild(badge);
+      }
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function cargarCasos() {
+      const res = await fetch("/api/casos");
+      const data = await res.json();
+      const cont = document.getElementById("casos-list");
+      cont.innerHTML = "";
+      data.casos.forEach(c => {
+        const btn = document.createElement("button");
+        btn.textContent = c;
+        btn.onclick = () => enviar(`Procesa la solicitud ${c}`);
+        cont.appendChild(btn);
+      });
+    }
+
+    async function actualizarEstado() {
+      const res = await fetch("/api/estado");
+      const data = await res.json();
+      const box = document.getElementById("ordenes-box");
+      if (!data.ordenes || data.ordenes.length === 0) {
+        box.textContent = "Sin órdenes registradas aún.";
+        return;
+      }
+      box.innerHTML = data.ordenes.map(o =>
+        `<div style="margin-bottom:6px;border-bottom:1px solid #334155;padding-bottom:4px;">
+          <b>OC ${o.numero_oc}</b> · ${o.orden.referencia.solicitud_id}<br/>
+          ${o.orden.proveedor.nombre} (${o.orden.moneda} ${o.orden.posiciones[0].precio_unitario * o.orden.posiciones[0].cantidad})
+        </div>`
+      ).join("");
+    }
+
+    async function enviar(texto) {
+      agregarMensaje("user", texto);
+      input.value = "";
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, message: texto })
+      });
+      const data = await res.json();
+      if (data.error) {
+        agregarMensaje("assistant", "Error: " + data.error);
+      } else {
+        agregarMensaje("assistant", data.reply, data.toolCalls || []);
+      }
+      await actualizarEstado();
+    }
+
+    function handleSubmit(e) {
+      e.preventDefault();
+      if (input.value.trim()) enviar(input.value.trim());
+    }
+
+    async function reiniciar() {
+      await fetch("/api/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId })
+      });
+      chat.innerHTML = '<div class="msg assistant">Sesión reiniciada. ¿Qué solicitud deseas procesar?</div>';
+    }
+
+    cargarCasos();
+    actualizarEstado();
+  </script>
+</body>
+</html>
